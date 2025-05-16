@@ -21,9 +21,6 @@
 #include <string>
 #include <cstdint>
 
-// Forward declarations for external libraries
-typedef void* TIFF;
-
 namespace SpatialIndex {
     namespace RTree { class RTree; }
 }
@@ -183,7 +180,7 @@ private:
     // Optimization caches and spatial indices
     std::unordered_map<int, std::vector<VoxelType>> sphericalMasks; ///< Cached sphere templates
     std::unordered_map<int, Interface> interfacialSegments;  ///< Contact regions
-    std::unique_ptr<SpatialIndex::RTree::RTree> spatialIndexSegs;   ///< R-tree for segments
+    std::unique_ptr<SpatialIndex::ISpatialIndex> spatialIndexSegs;   ///< R-tree for segments
 
     /**
      * @brief Calculates chunk coordinates for a point

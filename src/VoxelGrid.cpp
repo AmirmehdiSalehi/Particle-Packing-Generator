@@ -10,7 +10,6 @@
  */
 
 #include "VoxelGrid.h"
-#include "SpatialIndex.h"
 #include <tiffio.h>
 #include <algorithm>
 #include <iostream>
@@ -119,13 +118,13 @@ void VoxelGrid::addSphere(std::vector<Particle>& particles, const Point3D& cente
         for (int chunkY = minChunk.y; chunkY <= maxChunk.y; chunkY++) {
             for (int chunkZ = minChunk.z; chunkZ <= maxChunk.z; chunkZ++) {
                 // Calculate intersection with this chunk
-                int startX = std::max(minCorner.x, chunkX * chunkSize);
-                int startY = std::max(minCorner.y, chunkY * chunkSize);
-                int startZ = std::max(minCorner.z, chunkZ * chunkSize);
+                int startX = std::max(minCorner.x, static_cast<int>(chunkX * chunkSize));
+                int startY = std::max(minCorner.y, static_cast<int>(chunkY * chunkSize));
+                int startZ = std::max(minCorner.z, static_cast<int>(chunkZ * chunkSize));
                 
-                int endX = std::min(maxCorner.x, (chunkX + 1) * chunkSize - 1);
-                int endY = std::min(maxCorner.y, (chunkY + 1) * chunkSize - 1);
-                int endZ = std::min(maxCorner.z, (chunkZ + 1) * chunkSize - 1);
+                int endX = std::min(maxCorner.x, static_cast<int>((chunkX + 1) * chunkSize - 1));
+                int endY = std::min(maxCorner.y, static_cast<int>((chunkY + 1) * chunkSize - 1));
+                int endZ = std::min(maxCorner.z, static_cast<int>((chunkZ + 1) * chunkSize - 1));
 
                 uint32_t chunkIndex = chunkZ + chunkY * numChunks + 
                                      chunkX * numChunks * numChunks;

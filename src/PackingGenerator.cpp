@@ -10,7 +10,7 @@
  */
 
 #include "PackingGenerator.h"
-#include "SpatialIndex.h"
+#include <spatialindex/SpatialIndex.h>
 #include <random>
 #include <chrono>
 #include <iostream>

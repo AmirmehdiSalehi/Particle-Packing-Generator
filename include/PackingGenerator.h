@@ -155,7 +155,7 @@ private:
     // Core data structures
     std::vector<Particle> particles;          ///< All particles
     VoxelGrid voxelGrid;                      ///< 3D voxel representation
-    std::unique_ptr<SpatialIndex::RTree::RTree> spatialIndex; ///< Sphere R-tree
+    std::unique_ptr<SpatialIndex::ISpatialIndex> spatialIndex; ///< Sphere R-tree
     
     /**
      * @brief Stage 1: Inserts core spheres into the domain

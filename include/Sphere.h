@@ -13,7 +13,9 @@
 #define PACKING_SPHERE_H
 
 #include "Core.h"
+#include <vector>
 #include <cstdint>
+#include <spatialindex/SpatialIndex.h>
 
 namespace Packing {
 
@@ -88,6 +90,102 @@ private:
     uint32_t sphereId;   ///< Unique ID for spatial indexing
 };
 
+
+
+/**
+ * @class SphereData
+ * @brief Data wrapper for storing Sphere in spatial index
+ * 
+ * This class implements the SpatialIndex::IData interface to allow
+ * spheres to be stored and queried in an R-tree.
+ */
+class SphereData : public SpatialIndex::IData {
+public:
+    /**
+     * @brief Constructs a sphere data wrapper
+     * @param id Unique identifier for the sphere
+     * @param sphere Pointer to the Sphere
+     */
+    SphereData(uint32_t id, const Sphere* sphere);
+    
+    /**
+     * @brief Destructor
+     */
+    ~SphereData() override = default;
+    
+    /**
+     * @brief Gets the identifier for this data item
+     * @return Sphere ID
+     */
+    SpatialIndex::id_type getIdentifier() const override;
+    
+    /**
+     * @brief Gets the data payload
+     * @param length Output parameter for data length
+     * @param data Output parameter for data pointer
+     */
+    void getData(uint32_t& length, uint8_t** data) const override;
+
+    SphereData* clone() override;
+    
+    /**
+     * @brief Creates a shape representing the sphere
+     * @return Dynamically allocated shape object
+     */
+    // SpatialIndex::IShape* getShape() const;
+    
+    /**
+     * @brief Creates a shape via output parameter
+     * @param shape Output parameter for the shape
+     */
+    void getShape(SpatialIndex::IShape** shape) const override;
+
+private:
+    uint32_t m_id;        ///< Sphere identifier
+    const Sphere* m_sphere; ///< Pointer to the sphere
+};
+
+/**
+ * @class SphereVisitor
+ * @brief Visitor for collecting spheres from spatial queries
+ * 
+ * This visitor collects all spheres found during a spatial query operation.
+ */
+class SphereVisitor : public SpatialIndex::IVisitor {
+public:
+    /**
+     * @brief Default constructor
+     */
+    SphereVisitor() = default;
+    
+    /**
+     * @brief Destructor
+     */
+    ~SphereVisitor() override = default;
+    
+    /**
+     * @brief Called when visiting a node (not used)
+     * @param node The node being visited
+     */
+    void visitNode(const SpatialIndex::INode& node) override;
+    
+    /**
+     * @brief Called when visiting data
+     * @param data The data item found
+     */
+    void visitData(const SpatialIndex::IData& data) override;
+    
+    /**
+     * @brief Called when visiting multiple data items
+     * @param v Vector of data items
+     */
+    void visitData(std::vector<const SpatialIndex::IData*>& v) override;
+    
+    /// Collection of found spheres
+    std::vector<const Sphere*> foundSpheres;
+};
+
 } // namespace Packing
 
 #endif // PACKING_SPHERE_H
+

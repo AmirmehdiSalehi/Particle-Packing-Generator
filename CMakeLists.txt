@@ -14,20 +14,34 @@ option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
 # Find required packages
-find_package(SpatialIndex REQUIRED)
+find_package(libspatialindex REQUIRED)
 find_package(TIFF REQUIRED)
+
+set(SPATIALINDEX_INCLUDE_DIRS "$ENV{CONDA_PREFIX}/include")
 
 # Include directories
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${SPATIALINDEX_INCLUDE_DIRS}
     ${TIFF_INCLUDE_DIRS}
 )
 
+set(SPATIALINDEX_LIBRARIES "$ENV{CONDA_PREFIX}/lib/libspatialindex.dylib")
+
+# Verify the file exists
+if(NOT EXISTS ${SPATIALINDEX_LIBRARIES})
+    message(FATAL_ERROR "Library not found at: ${SPATIALINDEX_LIBRARIES}")
+endif()
+
+
 # Add main library
 add_library(PackingGenerator SHARED
-    PackingGenerator.cpp
-    PackingGenerator.h
+    src/PackingGenerator.cpp
+    src/CApi.cpp
+    src/Interface.cpp
+    src/Particle.cpp
+    src/Sphere.cpp
+    src/VoxelGrid.cpp
 )
 
 # Link dependencies to main library
@@ -44,7 +58,7 @@ set_target_properties(PackingGenerator PROPERTIES
 
 # Set up examples if enabled
 if(BUILD_EXAMPLES)
-    add_executable(example example.cpp)
+    add_executable(example tests/Example.cpp)
     target_link_libraries(example PackingGenerator)
 endif()
 
@@ -57,7 +71,7 @@ if(BUILD_PYTHON_BINDINGS)
     find_package(pybind11 CONFIG REQUIRED)
     
     # Add Python module
-    pybind11_add_module(particle_packing binding.cpp)
+    pybind11_add_module(particle_packing bindings/binding.cpp)
     
     # Link with our library
     target_link_libraries(particle_packing PRIVATE
@@ -84,21 +98,23 @@ install(TARGETS PackingGenerator
     ARCHIVE DESTINATION lib
 )
 
-install(FILES PackingGenerator.h
+install(FILES include/PackingGenerator.h
     DESTINATION include
 )
 
 # Add uninstall target
-if(NOT TARGET uninstall)
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-        IMMEDIATE @ONLY
-    )
-    
-    add_custom_target(uninstall
-        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-    )
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in")
+    if(NOT TARGET uninstall)
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+            IMMEDIATE @ONLY
+        )
+        
+        add_custom_target(uninstall
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+        )
+    endif()
 endif()
 
 # Output configuration information
@@ -109,4 +125,5 @@ message(STATUS "  Build Python bindings: ${BUILD_PYTHON_BINDINGS}")
 message(STATUS "  Build examples: ${BUILD_EXAMPLES}")
 message(STATUS "  Installation prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "  SpatialIndex include dir: ${SPATIALINDEX_INCLUDE_DIRS}")
+message(STATUS "  SpatialIndex lib dir: ${SPATIALINDEX_LIBRARIES}")
 message(STATUS "  TIFF include dir: ${TIFF_INCLUDE_DIRS}")
