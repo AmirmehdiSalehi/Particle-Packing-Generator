@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <string>
 #include <cstdint>
+#include <spatialindex/capi/IdVisitor.h>
 
 namespace SpatialIndex {
     namespace RTree { class RTree; }
@@ -179,7 +180,7 @@ private:
 
     // Optimization caches and spatial indices
     std::unordered_map<int, std::vector<VoxelType>> sphericalMasks; ///< Cached sphere templates
-    std::unordered_map<int, Interface> interfacialSegments;  ///< Contact regions
+    std::unordered_map<int, std::shared_ptr<Interface>> interfacialSegments;  ///< Contact regions
     std::unique_ptr<SpatialIndex::ISpatialIndex> spatialIndexSegs;   ///< R-tree for segments
 
     /**

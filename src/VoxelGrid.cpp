@@ -266,30 +266,29 @@ void VoxelGrid::addInterfaceSegment(const Point3D& point) {
     SpatialIndex::Point queryPoint(coords, 3);
     
     // Find segments that might contain this point
-    SegmentVisitor visitor;
+    IdVisitor visitor;
     spatialIndexSegs->intersectsWithQuery(queryPoint, visitor);
     
-    std::vector<const Interface*> containingSegments;
+    std::vector<const uint64_t> containingSegments;
     
     // Check which segments actually contain the point
-    for (const auto* foundSegment : visitor.foundSegments) {
-        Point3D mutablePoint = point;
-        if (foundSegment->contains(mutablePoint)) {
-            containingSegments.push_back(foundSegment);
+    for (const auto foundSegmentId : visitor.GetResults()) {
+        auto it = interfacialSegments.find(foundSegmentId);
+        if (it != interfacialSegments.end() && (it->second)->contains(point)) {
+            containingSegments.push_back(foundSegmentId);
         }
     }
     
     // Case 1: No existing segment - create new
     if (containingSegments.empty()) {
         int segmentId = interfaceSegsCount++;
-        auto result = interfacialSegments.emplace(segmentId, segmentId);
-        Interface& segment = result.first->second;
+        auto result = interfacialSegments.emplace(segmentId, std::make_shared<Interface>(segmentId));
+        std::shared_ptr<Interface>& segment = result.first->second;
         
-        Point3D mutablePoint = point;
-        segment.addPoint(mutablePoint);
+        segment->addPoint(point);
         
         // Add to spatial index
-        const auto& bbox = segment.getBoundingBox();
+        const auto& bbox = segment->getBoundingBox();
         double pLow[3] = {
             static_cast<double>(bbox[0]), 
             static_cast<double>(bbox[1]), 
@@ -300,28 +299,25 @@ void VoxelGrid::addInterfaceSegment(const Point3D& point) {
             static_cast<double>(bbox[4]), 
             static_cast<double>(bbox[5])
         };
+
         SpatialIndex::Region queryRegion(pLow, pHigh, 3);
-        
-        SegmentData* data = new SegmentData(segmentId, &segment);
-        spatialIndexSegs->insertData(sizeof(data), reinterpret_cast<uint8_t*>(&data), 
-                                    queryRegion, segmentId);
+        spatialIndexSegs->insertData(0, nullptr, queryRegion, segmentId);
+
     }
     // Case 2: One existing segment - add point to it
     else if (containingSegments.size() == 1) {
-        const Interface* foundSegment = containingSegments[0];
-        int segmentId = foundSegment->getId();
+        const uint64_t& segmentId = containingSegments[0];
         
         auto it = interfacialSegments.find(segmentId);
         if (it != interfacialSegments.end()) {
-            Interface& segment = it->second;
-            Point3D mutablePoint = point;
+            std::shared_ptr<Interface>& segment = it->second;
             
             // Only update if not already within bounding box
-            if (!segment.withinBbox(mutablePoint)) {
-                segment.addPoint(mutablePoint);
+            if (!segment->withinBbox(point)) {
+                segment->addPoint(point);
                 
                 // Update spatial index
-                const auto& bbox = segment.getBoundingBox();
+                const auto& bbox = segment->getBoundingBox();
                 double pLow[3] = {
                     static_cast<double>(bbox[0]), 
                     static_cast<double>(bbox[1]), 
@@ -335,29 +331,26 @@ void VoxelGrid::addInterfaceSegment(const Point3D& point) {
                 SpatialIndex::Region queryRegion(pLow, pHigh, 3);
                 
                 spatialIndexSegs->deleteData(queryRegion, segmentId);
-                SegmentData* data = new SegmentData(segmentId, &segment);
-                spatialIndexSegs->insertData(sizeof(data), reinterpret_cast<uint8_t*>(&data), 
-                                           queryRegion, segmentId);
+                spatialIndexSegs->insertData(0, nullptr, queryRegion, segmentId);
             }
         }
     }
     // Case 3: Multiple segments - merge them
     else if (containingSegments.size() > 1) {
-        std::vector<Interface*> segmentsToMerge;
-        for (const auto* segment : containingSegments) {
-            auto it = interfacialSegments.find(segment->getId());
+        std::vector<std::shared_ptr<Interface>> segmentsToMerge;
+        for (const auto segmentId : containingSegments) {
+            auto it = interfacialSegments.find(segmentId);
             if (it != interfacialSegments.end()) {
-                segmentsToMerge.push_back(&(it->second));
+                segmentsToMerge.push_back(it->second);
             }
         }
         
         if (!segmentsToMerge.empty()) {
             // Use first segment as merge target
-            Interface* targetSegment = segmentsToMerge[0];
-            int targetId = targetSegment->getId();
-            Point3D mutablePoint = point;
+            std::shared_ptr<Interface>& targetSegment = segmentsToMerge[0];
+            uint64_t targetId = targetSegment->getId();
             
-            targetSegment->addPoint(mutablePoint);
+            targetSegment->addPoint(point);
             targetSegment->mergeSegments(segmentsToMerge, interfacialSegments);
             
             // Update spatial index
@@ -375,14 +368,13 @@ void VoxelGrid::addInterfaceSegment(const Point3D& point) {
             SpatialIndex::Region queryRegion(pLow, pHigh, 3);
             
             // Remove old entries
-            for (const auto* segment : containingSegments) {
-                spatialIndexSegs->deleteData(queryRegion, segment->getId());
+            for (const auto segmentId : containingSegments) {
+                spatialIndexSegs->deleteData(queryRegion, segmentId);
             }
             
             // Insert merged segment
-            SegmentData* data = new SegmentData(targetId, targetSegment);
-            spatialIndexSegs->insertData(sizeof(data), reinterpret_cast<uint8_t*>(&data), 
-                                       queryRegion, targetId);
+            spatialIndexSegs->insertData(0, nullptr, queryRegion, targetId);
+
         }
     }
 }

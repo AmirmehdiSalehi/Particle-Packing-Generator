@@ -124,7 +124,11 @@ public:
      * @param length Output parameter for data length
      * @param data Output parameter for data pointer
      */
+
     void getData(uint32_t& length, uint8_t** data) const override;
+
+    // const std::shared_ptr<Sphere> getPointer() const;
+
 
     SphereData* clone() override;
     

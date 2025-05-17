@@ -27,7 +27,7 @@ Interface::~Interface() {
     // Automatic cleanup of STL containers
 }
 
-void Interface::addPoint(Point3D& point) {
+void Interface::addPoint(const Point3D& point) {
     // Define the 18-connected neighborhood (face and edge connections)
     // This includes the point itself and its 18 face/edge neighbors
     const int dx[] = {0, -1, 1, 0, 0, 0, 0, -1, -1, 1, 1, -1, -1, 1, 1, 0, 0, 0, 0};
@@ -66,7 +66,7 @@ void Interface::mergeBbox(std::array<uint32_t, 6>& otherBbox) {
     }
 }
 
-bool Interface::withinBbox(Point3D& point) const {
+bool Interface::withinBbox(const Point3D& point) const {
     // Check if point coordinates fall within the bounding box
     return (static_cast<uint32_t>(point.x) > bbox[0] && 
             static_cast<uint32_t>(point.y) > bbox[1] && 
@@ -76,13 +76,13 @@ bool Interface::withinBbox(Point3D& point) const {
             static_cast<uint32_t>(point.z) < bbox[5]);
 }
 
-bool Interface::contains(Point3D& point) const {
+bool Interface::contains(const Point3D& point) const {
     // Check if the point exists in the segment set
     return segment.find(point) != segment.end();
 }
 
-bool Interface::mergeSegments(std::vector<Interface*>& mergingSegments, 
-                                    std::unordered_map<int, Interface>& interfacialSegments) {
+bool Interface::mergeSegments(std::vector<std::shared_ptr<Interface>>& mergingSegments, 
+                                    std::unordered_map<int, std::shared_ptr<Interface>>& interfacialSegments) {
     if (mergingSegments.empty()) {
         return false;
     }

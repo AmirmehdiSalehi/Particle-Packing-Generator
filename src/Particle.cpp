@@ -22,18 +22,18 @@ Particle::Particle(uint16_t id)
     : id(id), bulkCount(0), surfaceCount(0) {
 }
 
-const Sphere& Particle::addSphere(const Point3D& center, int radius, 
+const std::shared_ptr<Sphere>& Particle::addSphere(const Point3D& center, int radius, 
                                  SphereType type, uint32_t sphereID) {
     // Create and add the sphere to this particle
-    spheres.emplace_back(center, radius, type, id, sphereID); 
+    spheres.emplace_back(std::make_shared<Sphere>(center, radius, type, id, sphereID)); 
     return spheres.back();                          
 }
 
-const Sphere* Particle::getCoreSphere() const {
+const std::shared_ptr<Sphere>& Particle::getCoreSphere() const {
     // Search for the core sphere in the collection
     for (const auto& sphere : spheres) {
-        if (sphere.getType() == SphereType::CORE) {
-            return &sphere;
+        if (sphere->getType() == SphereType::CORE) {
+            return sphere;
         }
     }
     return nullptr;

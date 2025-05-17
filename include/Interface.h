@@ -53,7 +53,7 @@ public:
      * neighbors (face and edge connections) to ensure proper coverage
      * of the interface region.
      */
-    void addPoint(Point3D& point);
+    void addPoint(const Point3D& point);
 
     /**
      * @brief Gets the axis-aligned bounding box of this segment
@@ -66,14 +66,14 @@ public:
      * @param point The point to check
      * @return true if the point is in this segment, false otherwise
      */
-    bool contains(Point3D& point) const;
+    bool contains(const Point3D& point) const;
 
     /**
      * @brief Checks if a point is within the bounding box
      * @param point The point to check
      * @return true if the point is inside the bounding box
      */
-    bool withinBbox(Point3D& point) const;
+    bool withinBbox(const Point3D& point) const;
 
     /**
      * @brief Merges another bounding box with this segment's bbox
@@ -90,8 +90,8 @@ public:
      * This method combines multiple adjacent segments into a single
      * larger segment, updating the spatial index accordingly.
      */
-    bool mergeSegments(std::vector<Interface*>& segments, 
-                      std::unordered_map<int, Interface>& interfacialSegments);
+    bool mergeSegments(std::vector<std::shared_ptr<Interface>>& segments, 
+                      std::unordered_map<int, std::shared_ptr<Interface>>& interfacialSegments);
 
     /**
      * @brief Gets the unique identifier of this segment

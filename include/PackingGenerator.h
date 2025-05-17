@@ -154,6 +154,7 @@ private:
     
     // Core data structures
     std::vector<Particle> particles;          ///< All particles
+    std::vector<std::shared_ptr<Sphere>> spheres; 
     VoxelGrid voxelGrid;                      ///< 3D voxel representation
     std::unique_ptr<SpatialIndex::ISpatialIndex> spatialIndex; ///< Sphere R-tree
     
@@ -202,16 +203,7 @@ private:
      * @return Random radius value
      */
     int getRandomRadius(int minRadius, int maxRadius) const;
-    
-    /**
-     * @brief Updates particle contact information
-     * 
-     * This method is called after packing generation to ensure
-     * all particle contacts are properly recorded. In the current
-     * implementation, contacts are tracked automatically during
-     * voxel operations.
-     */
-    void updateParticleContacts();
+
 };
 
 } // namespace Packing

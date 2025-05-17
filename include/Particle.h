@@ -54,20 +54,20 @@ public:
      * @param sphereID Unique ID for spatial indexing
      * @return Const reference to the newly added sphere
      */
-    const Sphere& addSphere(const Point3D& center, int radius, 
+    const std::shared_ptr<Sphere>& addSphere(const Point3D& center, int radius, 
                            SphereType type, uint32_t sphereID);
 
     /**
      * @brief Gets all spheres composing this particle
      * @return Const reference to the sphere vector
      */
-    const std::vector<Sphere>& getSpheres() const { return spheres; }
+    const std::vector<std::shared_ptr<Sphere>>& getSpheres() const { return spheres; }
     
     /**
      * @brief Finds and returns the core sphere of this particle
      * @return Pointer to the core sphere, or nullptr if none found
      */
-    const Sphere* getCoreSphere() const;
+    const std::shared_ptr<Sphere>& getCoreSphere() const;
     
     /**
      * @brief Gets the volume of this particle in voxels
@@ -135,7 +135,7 @@ private:
     uint16_t id;                ///< Unique particle identifier
     uint32_t bulkCount;         ///< Number of interior voxels (volume)
     uint32_t surfaceCount;      ///< Number of surface voxels (area)
-    std::vector<Sphere> spheres; ///< Component spheres of this particle
+    std::vector<std::shared_ptr<Sphere>> spheres; ///< Component spheres of this particle
 };
 
 } // namespace Packing
