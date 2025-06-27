@@ -35,7 +35,6 @@ void* CreatePackingGenerator(
             coreRadiusMin, coreRadiusMax,
             secondaryRadiusMin, secondaryRadiusMax,
             tertiaryRadiusMin, tertiaryRadiusMax,
-            tertiaryVolumeFraction,
             targetDensity,
             compactnessFactor
         );

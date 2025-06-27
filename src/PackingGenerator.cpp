@@ -16,8 +16,20 @@
 #include <iostream>
 #include <algorithm>
 #include <ctime>
+#include <set>
+
+#ifdef _WIN32
+    #include <process.h>  // For _getpid() on Windows
+    #define getpid _getpid
+#else
+    #include <unistd.h>   // For getpid() on Unix/Linux/macOS
+#endif
 
 namespace Packing {
+
+const int MAX_PENETRATION = 3;
+const double VICINITY_RATIO = 2.5;
+
 
 //=============================================================================
 // Constructor and Initialization
@@ -28,15 +40,14 @@ PackingGenerator::PackingGenerator(
     int coreRadiusMin, int coreRadiusMax,
     int secondaryRadiusMin, int secondaryRadiusMax,
     int tertiaryRadiusMin, int tertiaryRadiusMax,
-    double tertiaryVolumeFraction,
     double targetDensity,
-    double compactnessFactor
+    double compactnessFactor,
+    uint32_t randomSeed
 ) : size(size),
     numSpheres(0),
     coreRadiusMin(coreRadiusMin), coreRadiusMax(coreRadiusMax),
     secondaryRadiusMin(secondaryRadiusMin), secondaryRadiusMax(secondaryRadiusMax),
     tertiaryRadiusMin(tertiaryRadiusMin), tertiaryRadiusMax(tertiaryRadiusMax),
-    tertiaryVolumeFraction(tertiaryVolumeFraction),
     targetDensity(targetDensity),
     compactnessFactor(compactnessFactor),
     voxelGrid(size) {
@@ -67,7 +78,15 @@ PackingGenerator::PackingGenerator(
     );
     
     // Initialize random seed for reproducible results
-    srand(static_cast<unsigned int>(time(nullptr)));
+    if (randomSeed != 0) {
+        srand(randomSeed);
+    } else {
+        // Use microsecond precision + process ID for uniqueness
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = now.time_since_epoch();
+        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+        srand(static_cast<unsigned int>(microseconds + getpid()));
+    }
 }
 
 PackingGenerator::~PackingGenerator() {
@@ -186,7 +205,7 @@ uint32_t PackingGenerator::insertCoreSpheres() {
         for (const auto& foundSphereId : visitor.GetResults()) {
 
             double distance = center.distanceTo(spheres[foundSphereId]->getCenter());
-            double minDistance = radius + spheres[foundSphereId]->getRadius() - 5; // Small tolerance
+            double minDistance = radius + spheres[foundSphereId]->getRadius() - MAX_PENETRATION; // Small tolerance
             
             if (distance < minDistance) {
                 hasExcessiveOverlap = true;
@@ -224,6 +243,8 @@ uint32_t PackingGenerator::insertCoreSpheres() {
         // Check if we've reached target density for core spheres
         double density = getCurrentDensity();
         if (density > 0.7 * targetDensity) {  // Core spheres should achieve ~70% of target
+            std::cout << "    Core sphere insertion stopped due to density target reached: " 
+              << density << " (target: " << 0.7 * targetDensity << ")" << std::endl;
             break;
         }
         
@@ -233,18 +254,16 @@ uint32_t PackingGenerator::insertCoreSpheres() {
                      << "density: " << density << std::endl;
         }
     }
-    
+    if (attempts >= maxAttempts) {
+    std::cout << "    Core sphere insertion stopped due to max attempts reached: " 
+              << maxAttempts << " attempts" << std::endl;
+}
     if (consecutiveFailures >= maxConsecutiveFailures) {
         std::cout << "    Core sphere insertion stopped due to consecutive failures" << std::endl;
     }
     
     return totalCoreSpheres;
 }
-
-/**
- * @file PackingGenerator.cpp (Part 2)
- * @brief Implementation of the PackingGenerator class - Continued
- */
 
 //=============================================================================
 // Stage 2: Secondary Sphere Addition
@@ -281,7 +300,7 @@ uint32_t PackingGenerator::addSecondarySpheres(uint32_t maxAttempts) {
         int secondaryRadius = getRandomRadius(secondaryRadiusMin, secondaryRadiusMax);
         
         // Distance from core should allow for proper clustering
-        int maxDistance = static_cast<int>(2.5 * coreSphere->getRadius());
+        int maxDistance = static_cast<int>(VICINITY_RATIO * coreSphere->getRadius());
         int distanceFromCore = rand() % maxDistance;
         
         // Convert spherical to Cartesian coordinates
@@ -303,26 +322,15 @@ uint32_t PackingGenerator::addSecondarySpheres(uint32_t maxAttempts) {
             consecutiveFailures++;
             continue;
         }
-        
-        // Create temporary sphere for testing
-        uint32_t sphereId = numSpheres;
-        Sphere newSphere(center, secondaryRadius, SphereType::SECONDARY, particle.getId(), sphereId);
-        
+                
         // Verify compactness criteria with existing spheres in the particle
         bool meetsCriteria = false;
         
-        // Should be overlapping the core sphere compactly
-        if (newSphere.intersectsWith(*coreSphere, compactnessFactor)) {
-            meetsCriteria = true;
-        } 
-        // Otherwise, should be at least connected to core and compactly to any other secondary spheres
-        else if (newSphere.intersectsWith(*coreSphere, 1)){
-            for (const auto& existingSphere : particle.getSpheres()) {
-                if (existingSphere->getType() == SphereType::SECONDARY && 
-                    newSphere.intersectsWith(*existingSphere, compactnessFactor)) {
-                    meetsCriteria = true;
-                    break;
-                }
+        // Should be overlapping the core or any other sphere compactly
+        for (const auto& existingSphere : particle.getSpheres()) {
+            if (existingSphere->intersectsWith(center.x, center.y, center.z, secondaryRadius, compactnessFactor)) {
+                meetsCriteria = true;
+                break;
             }
         }
         
@@ -332,38 +340,40 @@ uint32_t PackingGenerator::addSecondarySpheres(uint32_t maxAttempts) {
             continue;
         }
         
-        // Check for overlap with other particles
+        // Check for excessive overlap with other particles
         double sphereCenterCoords[3] = {
             static_cast<double>(center.x), 
             static_cast<double>(center.y), 
             static_cast<double>(center.z)
         };
+
         SpatialIndex::Ball queryBall(secondaryRadius + secondaryRadiusMax, sphereCenterCoords, 3);
         
         IdVisitor visitor;
         spatialIndex->intersectsWithQuery(queryBall, visitor);
         
-        bool hasOverlap = false;
+        bool hasExcessOverlap = false;
         
         for (const auto foundSphereId : visitor.GetResults()) {
             if (spheres[foundSphereId]->getParticleId() != particle.getId()) {
                 double distance = center.distanceTo(spheres[foundSphereId]->getCenter());
-                double minDistance = secondaryRadius + spheres[foundSphereId]->getRadius() -5;
+                 double minDistance = secondaryRadius + spheres[foundSphereId]->getRadius() - MAX_PENETRATION;
                 
                 if (distance < minDistance) {
-                    hasOverlap = true;
+                    hasExcessOverlap = true;
                     break;
                 }
             }
         }
         
-        if (hasOverlap) {
+        if (hasExcessOverlap) {
             attempts++;
             consecutiveFailures++;
             continue;
         }
         
         // Add the sphere to the particle
+        uint32_t sphereId = numSpheres;
         const std::shared_ptr<Sphere>& sphere = particle.addSphere(center, secondaryRadius, 
                                                  SphereType::SECONDARY, sphereId);
         
@@ -462,15 +472,11 @@ uint32_t PackingGenerator::addTertiarySpheres(uint32_t maxAttempts) {
             consecutiveFailures++;
             continue;
         }
-        
-        // Create temporary sphere
-        uint32_t sphereId = numSpheres;
-        Sphere newSphere(center, tertiaryRadius, SphereType::TERTIARY, particle.getId(), sphereId);
-        
+                
         // Verify connection with at least one sphere in the particle
         bool isConnected = false;
         for (const auto& existingSphere : particleSpheres) {
-            if (newSphere.intersectsWith(*existingSphere, compactnessFactor)) {
+            if (existingSphere->intersectsWith(center.x, center.y, center.z, tertiaryRadius, compactnessFactor)) {
                 isConnected = true;
                 break;
             }
@@ -482,21 +488,14 @@ uint32_t PackingGenerator::addTertiarySpheres(uint32_t maxAttempts) {
             continue;
         }
         
-        // Check for opportunities to create inter-particle contacts
         double sphereCenterCoords[3] = {
             static_cast<double>(center.x), 
             static_cast<double>(center.y), 
             static_cast<double>(center.z)
         };
-        SpatialIndex::Ball queryBall(tertiaryRadius + tertiaryRadiusMax, sphereCenterCoords, 3);
-        
-        // IdVisitor visitor;
-        // spatialIndex->intersectsWithQuery(queryBall, visitor);
-        
-        bool hasExcessiveOverlap = false;
-        bool createsContact = false;
                 
         // Add the sphere
+        uint32_t sphereId = numSpheres;
         const std::shared_ptr<Sphere>& sphere = particle.addSphere(center, tertiaryRadius, 
                                                  SphereType::TERTIARY, sphereId);
         
@@ -535,6 +534,63 @@ uint32_t PackingGenerator::addTertiarySpheres(uint32_t maxAttempts) {
 }
 
 //=============================================================================
+// Supplementary Sphere Insertion (NEW METHOD)
+//=============================================================================
+
+bool PackingGenerator::insertSuppSpheres(int x, int y, int z, int radius, uint16_t particleID) {
+    // Find the target particle
+    Particle* particle = nullptr;
+    for (auto& p : particles) {
+        if (p.getId() == particleID) {
+            particle = &p;
+            break;
+        }
+    }
+    
+    if (!particle) {
+        return false; // Particle not found
+    }
+        
+    // Verify compactness criteria with existing spheres in the particle
+    bool meetsCriteria = false;
+    
+    // Should be overlapping with at least one existing sphere compactly (It automatically does!)
+    for (const auto& existingSphere : particle->getSpheres()) {
+        if (existingSphere->intersectsWith(x, y, z, radius, compactnessFactor)) {
+            meetsCriteria = true;
+            break;
+        }
+    }
+    
+    if (!meetsCriteria) {
+        return false;
+    }
+    
+    // Add the sphere to the particle
+    uint32_t sphereId = numSpheres;
+    Point3D center(x, y, z);
+    const std::shared_ptr<Sphere>& sphere = particle->addSphere(center, radius, 
+                                             SphereType::SECONDARY, sphereId);
+    
+    // Add to voxel grid
+    voxelGrid.addSphere(particles, center, radius, particle->getId());
+    
+    // Add to spatial index
+    double sphereCenterCoords[3] = {
+        static_cast<double>(center.x), 
+        static_cast<double>(center.y), 
+        static_cast<double>(center.z)
+    };
+    SpatialIndex::Ball sphereBall(radius, sphereCenterCoords, 3);
+    spatialIndex->insertData(0, nullptr, sphereBall, sphereId);
+    spheres.emplace_back(sphere);
+    
+    numSpheres++;
+    
+    return true;
+}
+
+//=============================================================================
 // Property Calculation Methods
 //=============================================================================
 
@@ -550,6 +606,14 @@ const Particle* PackingGenerator::getParticle(uint32_t index) const {
     }
     return nullptr;
 }
+
+const std::shared_ptr<Sphere> PackingGenerator::getSphere(uint32_t index) const {
+    if (index < spheres.size()) {
+        return spheres[index];
+    }
+    return nullptr;    
+}
+
 
 uint32_t PackingGenerator::getContactCount() const {
     return voxelGrid.getInterfaceSegmentCount();
@@ -593,6 +657,48 @@ double PackingGenerator::getAverageSphericity() const {
     return totalSphericity / particles.size();
 }
 
+double PackingGenerator::getAverageParticleRadius() const {
+    double totalRadius = 0;
+    for (const auto& particle : particles) {
+        totalRadius += std::cbrt(particle.getVolume() / (4 * M_PI / 3));
+    }
+
+    return totalRadius / particles.size();
+}
+
+uint32_t PackingGenerator::getTotalVolume() const { 
+    return voxelGrid.getFilledVoxelCount(); 
+}
+
+uint32_t PackingGenerator::getParticleVolume(uint16_t particleId) const {
+    const Particle* p = nullptr; 
+    for (const auto& particle : particles) {
+        if (particleId == particle.getId()) {
+            p = &particle;
+        }
+    }
+    return (p->getArea() + p->getVolume());
+}
+
+std::set<std::pair<uint16_t, uint16_t>> PackingGenerator::getContactPairs() const {
+    std::set<std::pair<uint16_t, uint16_t>> uniquePairs; // To avoid duplicates
+    
+    for (const auto& particle : particles) {
+        uint16_t particleId = particle.getId();
+        const std::set<uint16_t>& contacts = particle.getContacts();
+        
+        for (uint16_t contactId : contacts) {
+            // Create ordered pair to avoid duplicates (smaller ID first)
+            uint16_t first = std::min(particleId, contactId);
+            uint16_t second = std::max(particleId, contactId);
+            
+            std::pair<uint16_t, uint16_t> contactPair(first, second);
+        }
+    }
+    
+    return uniquePairs;
+}
+
 //=============================================================================
 // File Output Method
 //=============================================================================
@@ -612,6 +718,25 @@ Point3D PackingGenerator::getRandomPoint() const {
         rand() % size
     );
 }
+
+std::vector<uint64_t> PackingGenerator::getSphereNeighbors(int x, int y, int z, int radius) const {
+
+    double sphereCenterCoords[3] = {
+            static_cast<double>(x), 
+            static_cast<double>(y), 
+            static_cast<double>(z)
+        };
+
+     SpatialIndex::Ball queryBall(static_cast<double>(radius) * 1.5, sphereCenterCoords, 3);
+     
+     IdVisitor visitor;
+     spatialIndex->intersectsWithQuery(queryBall, visitor);
+ 
+     return visitor.GetResults();
+
+}
+
+
 
 int PackingGenerator::getRandomRadius(int minRadius, int maxRadius) const {
     return minRadius + rand() % (maxRadius - minRadius + 1);

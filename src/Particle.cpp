@@ -29,7 +29,7 @@ const std::shared_ptr<Sphere>& Particle::addSphere(const Point3D& center, int ra
     return spheres.back();                          
 }
 
-const std::shared_ptr<Sphere>& Particle::getCoreSphere() const {
+const std::shared_ptr<Sphere> Particle::getCoreSphere() const {
     // Search for the core sphere in the collection
     for (const auto& sphere : spheres) {
         if (sphere->getType() == SphereType::CORE) {

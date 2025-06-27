@@ -20,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <utility>
 
 // Forward declaration for spatial indexing
 namespace SpatialIndex {
@@ -58,12 +59,12 @@ public:
      */
     PackingGenerator(
         uint32_t size,
-        int coreRadiusMin, int coreRadiusMax,
-        int secondaryRadiusMin, int secondaryRadiusMax,
-        int tertiaryRadiusMin, int tertiaryRadiusMax,
-        double tertiaryVolumeFraction,
-        double targetDensity,
-        double compactnessFactor = 0.5
+        int coreRadiusMin = 10, int coreRadiusMax = 20,
+        int secondaryRadiusMin = 7, int secondaryRadiusMax = 12,
+        int tertiaryRadiusMin = 2, int tertiaryRadiusMax = 7,
+        double targetDensity = 0.6,
+        double compactnessFactor = 0.5,
+        uint32_t randomSeed = 0
     );
     
     /**
@@ -94,10 +95,23 @@ public:
     const Particle* getParticle(uint32_t index) const;
     
     /**
+     * @brief Gets a sphere by index
+     * @param index Particle index (0-based)
+     * @return Pointer to particle or nullptr if index is invalid
+     */
+    const std::shared_ptr<Sphere> getSphere(uint32_t index) const;
+    
+    /**
      * @brief Gets the total number of particles
      * @return Number of particles in the packing
      */
     uint32_t getParticleCount() const { return particles.size(); }
+    
+    /**
+     * @brief Gets the total number of particles
+     * @return Number of particles in the packing
+     */
+    uint32_t getSphereCount() const { return spheres.size(); }
     
     /**
      * @brief Gets all particles in the packing
@@ -130,6 +144,18 @@ public:
     double getAverageSphericity() const;
     
     /**
+     * @brief Calculates the average particle radius 
+     * @return Mean particle radius using the equivalent sphere volume
+     */
+    double getAverageParticleRadius() const;
+    
+    /**
+     * @brief Calculates the total number of filled voxels
+     * @return The total volume occupied in the voxel grid by the particles
+     */
+    uint32_t getTotalVolume() const;
+
+    /**
      * @brief Saves the packing as a 3D TIFF image
      * @param filename Output filename
      * @param binary If true, save as binary (filled/empty),
@@ -137,6 +163,52 @@ public:
      * @return true if save was successful
      */
     bool saveTIFF(const std::string& filename, bool binary = true) const;
+
+    /**
+     * @brief Gets all contact pairs between particles 
+     * @return Vector of pairs (particleID1, particleID2) representing contacts
+     * 
+     * Used by the RL environemnt to build edges among the core sphere nodes in the graph representation
+     * Each contact is represented only once (no duplicates).
+     * Uses the contact information stored in each particle.
+     */
+    std::set<std::pair<uint16_t, uint16_t>> getContactPairs() const;
+
+    std::vector<uint64_t> getSphereNeighbors(int x, int y, int z, int radius) const;
+
+    /**
+     * @brief Gets the volume of a particle given its index
+     * @return particle volume
+     * 
+     * Used by the RL environemnt to build the core sphere nodes in the graph representation
+     * Uses the number of 'bulk' voxels in each particle and takes particle overlaps into account
+     */
+    uint32_t getParticleVolume(uint16_t particleId) const;
+
+    /**
+     * @brief Inserts a supplementary sphere into a specific particle
+     * @param center Center position of the sphere
+     * @param radius Radius of the sphere
+     * @param particleID ID of the particle to add the sphere to
+     * @return true if sphere was successfully added, false otherwise
+     * 
+     * This method adds a sphere to an existing particle following the same
+     * compactness criteria as secondary spheres, but without overlap checking
+     * with other particles. If the sphere doesn't meet compactness criteria
+     * with existing spheres in the target particle, the method returns false.
+     */
+    bool insertSuppSpheres(int x, int y, int z, int radius, uint16_t particleID);
+
+    /**
+     * @brief Inserts core spheres into the domain
+     * @return Number of core spheres successfully placed
+     * 
+     * Core spheres are placed randomly without overlap to establish
+     * particle centers. Placement continues until the target density
+     * fraction is reached or no more spheres can be placed.
+     * Made public for RL integration.
+     */
+    uint32_t insertCoreSpheres();
  
 private:
     // Configuration parameters
@@ -158,15 +230,7 @@ private:
     VoxelGrid voxelGrid;                      ///< 3D voxel representation
     std::unique_ptr<SpatialIndex::ISpatialIndex> spatialIndex; ///< Sphere R-tree
     
-    /**
-     * @brief Stage 1: Inserts core spheres into the domain
-     * @return Number of core spheres successfully placed
-     * 
-     * Core spheres are placed randomly without overlap to establish
-     * particle centers. Placement continues until the target density
-     * fraction is reached or no more spheres can be placed.
-     */
-    uint32_t insertCoreSpheres();
+
     
     /**
      * @brief Stage 2: Adds secondary spheres to existing particles

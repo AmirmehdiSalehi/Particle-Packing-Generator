@@ -90,7 +90,7 @@ void VoxelGrid::addSphere(std::vector<Particle>& particles, const Point3D& cente
     
     // Get the pre-computed spherical mask
     const auto& mask = it->second;
-    size_t maskSize = 2 * (radius + 1);
+    size_t maskSize = 2 * (radius + 1) + 1;
 
     // Calculate bounding box for the sphere
     Point3D minCorner(center.x - (radius + 1), 
@@ -161,13 +161,6 @@ void VoxelGrid::addSphere(std::vector<Particle>& particles, const Point3D& cente
         }
     }
 }
-
-/**
- * @file VoxelGrid.cpp (Part 2)
- * @brief Implementation of the VoxelGrid class - Continued
- */
-
-// Continuing VoxelGrid.cpp...
 
 //=============================================================================
 // Voxel Manipulation Operations
@@ -482,7 +475,7 @@ VoxelGrid::createMask(int radius) {
     std::list<Point3D> potentialSurfaceVoxels;
     
     // Create mask grid
-    size_t maskSize = 2 * (radius + 1);
+    size_t maskSize = 2 * (radius + 1) + 1;
     std::vector<VoxelType> maskGrid(maskSize * maskSize * maskSize, VoxelType::AIR);
     
     // Fill sphere with bulk voxels
@@ -525,12 +518,11 @@ VoxelGrid::createMask(int radius) {
                 
                 size_t neighborIndex = nz + ny * maskSize + nx * maskSize * maskSize;
                 
-                // If neighbor is empty, mark current as surface and neighbor as gap
+                // If neighbor is empty, mark current as surface
                 if (maskGrid[neighborIndex] == VoxelType::AIR) {
                     size_t voxelIndex = voxel.z + voxel.y * maskSize + 
                                        voxel.x * maskSize * maskSize;
                     maskGrid[voxelIndex] = VoxelType::SURFACE;
-                    maskGrid[neighborIndex] = VoxelType::GAP;
                     break;
                 }
             }

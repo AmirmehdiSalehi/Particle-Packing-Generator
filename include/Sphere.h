@@ -81,6 +81,8 @@ public:
      * r2 - r1 < d ≤ r2 - (β × r1), where d is the center distance
      */
     bool intersectsWith(const Sphere& other, double beta = 0.5) const;
+    bool intersectsWith(const double x, const double y, const double z, const double radius, double beta = 0.5) const;
+
       
 private:
     Point3D center;      ///< Center coordinates in voxel space

@@ -13,6 +13,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
+
+# set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+# set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+# set(CMAKE_INSTALL_RPATH "${CMAKE_CURRENT_SOURCE_DIR}/lib; $ENV{CONDA_PREFIX}/lib; $ENV{CONDA_PREFIX}/libspatialindex.8.dylib")
+
 # Find required packages
 find_package(libspatialindex REQUIRED)
 find_package(TIFF REQUIRED)

@@ -95,7 +95,6 @@ int main(int argc, char* argv[]) {
         coreRadiusMin, coreRadiusMax,
         secondaryRadiusMin, secondaryRadiusMax,
         tertiaryRadiusMin, tertiaryRadiusMax,
-        tertiaryVolumeFraction,
         targetDensity,
         compactnessFactor
     );

@@ -67,7 +67,7 @@ public:
      * @brief Finds and returns the core sphere of this particle
      * @return Pointer to the core sphere, or nullptr if none found
      */
-    const std::shared_ptr<Sphere>& getCoreSphere() const;
+    const std::shared_ptr<Sphere> getCoreSphere() const;
     
     /**
      * @brief Gets the volume of this particle in voxels

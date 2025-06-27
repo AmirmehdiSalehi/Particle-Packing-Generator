@@ -43,7 +43,6 @@ enum class VoxelType {
     SURFACE,  ///< Surface voxels marking particle boundaries
     BULK,     ///< Interior voxels within particles
     AIR,      ///< Empty space outside particles
-    GAP       ///< Transition voxels between particles (used for contact detection)
 };
 
 /**

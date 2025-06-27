@@ -6,9 +6,13 @@ This script demonstrates how to create, configure, and analyze particle packings
 
 import os
 import sys
+import gc  # Added missing import for garbage collector
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+# Add the directory containing the module to Python's path
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "build/python"))
 
 # Import the particle packing module
 try:
@@ -25,10 +29,9 @@ def create_packing(
     core_radius_range=(30, 40),
     secondary_radius_range=(20, 30),
     tertiary_radius_range=(5, 10),
-    tertiary_volume_fraction=0.1,
     target_density=0.65,
     compactness_factor=0.5,
-    output_file="packing.tiff"
+    output_file="python_exports/packing.tiff"
 ):
     """
     Create a random packing of non-spherical particles.
@@ -54,7 +57,6 @@ def create_packing(
         core_radius_range[0], core_radius_range[1],
         secondary_radius_range[0], secondary_radius_range[1],
         tertiary_radius_range[0], tertiary_radius_range[1],
-        tertiary_volume_fraction,
         target_density,
         compactness_factor
     )
@@ -77,6 +79,7 @@ def create_packing(
     
     # Save the packing
     print(f"\nSaving packing to {output_file}...")
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)  # Ensure directory exists
     generator.saveTIFF(output_file, True)
     print("Done!")
     
@@ -104,7 +107,7 @@ def analyze_packing(generator):
     plt.ylabel('Frequency')
     plt.title('Particle Coordination Number Distribution')
     plt.grid(alpha=0.3)
-    plt.savefig('coordination_distribution.png')
+    plt.savefig('python_exports/coordination_distribution.png')
     print("Saved coordination number distribution to coordination_distribution.png")
     
     # Get all particles for analysis
@@ -122,7 +125,7 @@ def analyze_packing(generator):
     plt.ylabel('Coordination Number')
     plt.title('Sphericity vs Coordination Number')
     plt.grid(alpha=0.3)
-    plt.savefig('sphericity_vs_coordination.png')
+    plt.savefig('python_exports/sphericity_vs_coordination.png')
     print("Saved sphericity vs coordination plot to sphericity_vs_coordination.png")
     
     # Plot volume vs area
@@ -132,7 +135,7 @@ def analyze_packing(generator):
     plt.ylabel('Particle Surface Area (voxels)')
     plt.title('Particle Volume vs Surface Area')
     plt.grid(alpha=0.3)
-    plt.savefig('volume_vs_area.png')
+    plt.savefig('python_exports/volume_vs_area.png')
     print("Saved volume vs area plot to volume_vs_area.png")
     
 def visualize_particle(particle, ax=None):
@@ -147,18 +150,36 @@ def visualize_particle(particle, ax=None):
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
     
-    # Draw each sphere in the particle
-    for sphere in particle.getSpheres():
-        # Get sphere properties
+    # IMPORTANT: Make safe copies of all data first to avoid reference issues
+    sphere_data = []
+    spheres = particle.getSpheres()  # Get a copy of the spheres list
+    
+    for sphere in spheres:
         center = sphere.getCenter()
-        radius = sphere.getRadius()
-        sphere_type = sphere.getType()
-        
+        sphere_data.append({
+            'x': center.x,
+            'y': center.y, 
+            'z': center.z,
+            'radius': sphere.getRadius(),
+            'type': sphere.getType()
+        })
+        # Force garbage collection - now properly imported at the top of the file
+        gc.collect()
+    
+    # Call explicit garbage collection after processing all spheres
+    pp.collect_garbage()  # Use the garbage collection helper from our bindings
+    gc.collect()
+    
+    # Clear references to help with garbage collection
+    spheres = None
+    
+    # Draw each sphere using our safely copied data
+    for s in sphere_data:
         # Color based on sphere type
-        if sphere_type == pp.SphereType.CORE:
+        if s['type'] == pp.SphereType.CORE:
             color = 'red'
             alpha = 0.7
-        elif sphere_type == pp.SphereType.SECONDARY:
+        elif s['type'] == pp.SphereType.SECONDARY:
             color = 'green'
             alpha = 0.5
         else:  # TERTIARY
@@ -167,9 +188,9 @@ def visualize_particle(particle, ax=None):
         
         # Create a wireframe sphere
         u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-        x = center.x + radius * np.cos(u) * np.sin(v)
-        y = center.y + radius * np.sin(u) * np.sin(v)
-        z = center.z + radius * np.cos(v)
+        x = s['x'] + s['radius'] * np.cos(u) * np.sin(v)
+        y = s['y'] + s['radius'] * np.sin(u) * np.sin(v)
+        z = s['z'] + s['radius'] * np.cos(v)
         
         # Plot the sphere
         ax.plot_wireframe(x, y, z, color=color, alpha=alpha)
@@ -180,26 +201,24 @@ def visualize_particle(particle, ax=None):
     ax.set_zlabel('Z')
     ax.set_title(f'Particle {particle.getId()} - Sphericity: {particle.calculateSphericity():.4f}')
     
-    # Try to maintain aspect ratio
-    max_range = max(
-        [max(sphere.getCenter().x + sphere.getRadius() for sphere in particle.getSpheres()) - 
-         min(sphere.getCenter().x - sphere.getRadius() for sphere in particle.getSpheres()),
-         max(sphere.getCenter().y + sphere.getRadius() for sphere in particle.getSpheres()) - 
-         min(sphere.getCenter().y - sphere.getRadius() for sphere in particle.getSpheres()),
-         max(sphere.getCenter().z + sphere.getRadius() for sphere in particle.getSpheres()) - 
-         min(sphere.getCenter().z - sphere.getRadius() for sphere in particle.getSpheres())]
-    )
+    # Try to maintain aspect ratio (using copies of our data)
+    max_range = max([
+        max(s['x'] + s['radius'] for s in sphere_data) - min(s['x'] - s['radius'] for s in sphere_data),
+        max(s['y'] + s['radius'] for s in sphere_data) - min(s['y'] - s['radius'] for s in sphere_data),
+        max(s['z'] + s['radius'] for s in sphere_data) - min(s['z'] - s['radius'] for s in sphere_data)
+    ])
     
-    mid_x = (max(sphere.getCenter().x for sphere in particle.getSpheres()) + 
-             min(sphere.getCenter().x for sphere in particle.getSpheres())) / 2
-    mid_y = (max(sphere.getCenter().y for sphere in particle.getSpheres()) + 
-             min(sphere.getCenter().y for sphere in particle.getSpheres())) / 2
-    mid_z = (max(sphere.getCenter().z for sphere in particle.getSpheres()) + 
-             min(sphere.getCenter().z for sphere in particle.getSpheres())) / 2
+    mid_x = (max(s['x'] for s in sphere_data) + min(s['x'] for s in sphere_data)) / 2
+    mid_y = (max(s['y'] for s in sphere_data) + min(s['y'] for s in sphere_data)) / 2
+    mid_z = (max(s['z'] for s in sphere_data) + min(s['z'] for s in sphere_data)) / 2
 
     ax.set_xlim(mid_x - max_range/2, mid_x + max_range/2)
     ax.set_ylim(mid_y - max_range/2, mid_y + max_range/2)
     ax.set_zlim(mid_z - max_range/2, mid_z + max_range/2)
+    
+    # Clear references to help with garbage collection
+    sphere_data = None
+    gc.collect()
     
     return ax
 
@@ -210,16 +229,18 @@ def main():
     print("Random Packing Generator - Python Demo")
     print("======================================")
     
+    # Create output directory if it doesn't exist
+    os.makedirs("python_exports", exist_ok=True)
+    
     # Create a packing
     generator = create_packing(
         size=300,
         core_radius_range=(30, 40),
         secondary_radius_range=(20, 30),
         tertiary_radius_range=(5, 10),
-        tertiary_volume_fraction=0.1,
         target_density=0.65,
         compactness_factor=0.5,
-        output_file="packing.tiff"
+        output_file="python_exports/packing.tiff"
     )
     
     if generator is None:
@@ -229,42 +250,42 @@ def main():
     analyze_packing(generator)
     
     # Visualize a few particles
-    if generator.getParticleCount() > 0:
-        print("\nVisualizing example particles...")
-        fig = plt.figure(figsize=(15, 5))
+    # if generator.getParticleCount() > 0:
+    #     print("\nVisualizing example particles...")
+    #     fig = plt.figure(figsize=(15, 5))
         
-        # Get a few particles with different characteristics
-        particles = generator.getParticles()
+    #     # Get a few particles with different characteristics
+    #     particles = generator.getParticles()
         
-        # Sort particles by sphericity
-        particles_by_sphericity = sorted(particles, key=lambda p: p.calculateSphericity())
+    #     # Sort particles by sphericity
+    #     particles_by_sphericity = sorted(particles, key=lambda p: p.calculateSphericity())
         
-        if len(particles) >= 3:
-            # Plot lowest sphericity particle
-            ax1 = fig.add_subplot(131, projection='3d')
-            visualize_particle(particles_by_sphericity[0], ax1)
+    #     if len(particles) >= 3:
+    #         # Plot lowest sphericity particle
+    #         ax1 = fig.add_subplot(131, projection='3d')
+    #         visualize_particle(particles_by_sphericity[0], ax1)
             
-            # Plot median sphericity particle
-            middle_idx = len(particles) // 2
-            ax2 = fig.add_subplot(132, projection='3d')
-            visualize_particle(particles_by_sphericity[middle_idx], ax2)
+    #         # Plot median sphericity particle
+    #         middle_idx = len(particles) // 2
+    #         ax2 = fig.add_subplot(132, projection='3d')
+    #         visualize_particle(particles_by_sphericity[middle_idx], ax2)
             
-            # Plot highest sphericity particle
-            ax3 = fig.add_subplot(133, projection='3d')
-            visualize_particle(particles_by_sphericity[-1], ax3)
+    #         # Plot highest sphericity particle
+    #         ax3 = fig.add_subplot(133, projection='3d')
+    #         visualize_particle(particles_by_sphericity[-1], ax3)
             
-            plt.tight_layout()
-            plt.savefig('example_particles.png')
-            print("Saved example particle visualizations to example_particles.png")
-        else:
-            # Just plot one particle
-            ax = fig.add_subplot(111, projection='3d')
-            visualize_particle(particles[0], ax)
-            plt.tight_layout()
-            plt.savefig('example_particle.png')
-            print("Saved example particle visualization to example_particle.png")
+    #         plt.tight_layout()
+    #         plt.savefig('python_exports/example_particles.png')
+    #         print("Saved example particle visualizations to python_exports/example_particles.png")
+    #     else:
+    #         # Just plot one particle
+    #         ax = fig.add_subplot(111, projection='3d')
+    #         visualize_particle(particles[0], ax)
+    #         plt.tight_layout()
+    #         plt.savefig('python_exports/example_particle.png')
+    #         print("Saved example particle visualization to python_exports/example_particle.png")
     
-    print("\nDemo completed successfully!")
+    # print("\nDemo completed successfully!")
 
 if __name__ == "__main__":
     main()
