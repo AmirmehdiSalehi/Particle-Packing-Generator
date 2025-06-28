@@ -43,9 +43,79 @@ if(NOT SPATIALINDEX_FOUND AND PkgConfig_FOUND)
     endif()
 endif()
 
-# Method 3: Manual search in common locations
+# Method 3: Search for local source builds (sibling directories)
 if(NOT SPATIALINDEX_FOUND)
-    # Common installation prefixes
+    # Common local build locations relative to project root
+    set(LOCAL_BUILD_PREFIXES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../libspatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../spatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libspatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/spatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libspatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/spatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/libspatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/spatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../external/libspatialindex
+        ${CMAKE_CURRENT_SOURCE_DIR}/../external/spatialindex
+    )
+    
+    # Find include directory in local builds
+    find_path(SPATIALINDEX_INCLUDE_DIR
+        NAMES spatialindex/SpatialIndex.h
+        PATHS ${LOCAL_BUILD_PREFIXES}
+        PATH_SUFFIXES 
+            include
+            src
+            # CMake build directories
+            build/include
+            build/install/include
+            # Make install directories  
+            install/include
+            # Direct source directory
+            .
+        NO_DEFAULT_PATH  # Only search specified paths
+        DOC "SpatialIndex include directory (local build)"
+    )
+    
+    # Find library in local builds
+    find_library(SPATIALINDEX_LIBRARY
+        NAMES 
+            spatialindex
+            libspatialindex
+            spatialindex_64
+        PATHS ${LOCAL_BUILD_PREFIXES}
+        PATH_SUFFIXES 
+            lib
+            lib64
+            # CMake build directories
+            build/lib
+            build/lib64
+            build/src
+            build/install/lib
+            build/install/lib64
+            # Make build directories
+            src/.libs
+            lib/.libs
+            # Install directories
+            install/lib
+            install/lib64
+        NO_DEFAULT_PATH  # Only search specified paths
+        DOC "SpatialIndex library (local build)"
+    )
+    
+    if(SPATIALINDEX_INCLUDE_DIR AND SPATIALINDEX_LIBRARY)
+        set(SPATIALINDEX_FOUND TRUE)
+        set(SPATIALINDEX_INCLUDE_DIRS ${SPATIALINDEX_INCLUDE_DIR})
+        set(SPATIALINDEX_LIBRARIES ${SPATIALINDEX_LIBRARY})
+        message(STATUS "Found libspatialindex in local build:")
+        message(STATUS "  Include: ${SPATIALINDEX_INCLUDE_DIRS}")
+        message(STATUS "  Library: ${SPATIALINDEX_LIBRARIES}")
+    endif()
+endif()
+
+# Method 4: Manual search in system locations
+if(NOT SPATIALINDEX_FOUND)
+    # Common system installation prefixes
     set(SEARCH_PREFIXES
         /usr
         /usr/local
@@ -82,7 +152,7 @@ if(NOT SPATIALINDEX_FOUND)
         set(SPATIALINDEX_FOUND TRUE)
         set(SPATIALINDEX_INCLUDE_DIRS ${SPATIALINDEX_INCLUDE_DIR})
         set(SPATIALINDEX_LIBRARIES ${SPATIALINDEX_LIBRARY})
-        message(STATUS "Found libspatialindex manually:")
+        message(STATUS "Found libspatialindex in system installation:")
         message(STATUS "  Include: ${SPATIALINDEX_INCLUDE_DIRS}")
         message(STATUS "  Library: ${SPATIALINDEX_LIBRARIES}")
     endif()
@@ -91,26 +161,111 @@ endif()
 # Error if not found
 if(NOT SPATIALINDEX_FOUND)
     message(FATAL_ERROR "libspatialindex not found. Please install it using one of these methods:
-    
+
+    SYSTEM PACKAGES:
+    ================
     Ubuntu/Debian: sudo apt-get install libspatialindex-dev
     CentOS/RHEL:   sudo yum install spatialindex-devel
     macOS:         brew install spatialindex
     Conda:         conda install -c conda-forge libspatialindex
     Windows:       vcpkg install spatialindex
+
+    BUILD FROM SOURCE (will be auto-detected):
+    ==========================================
+    # Clone and build in parent directory:
+    cd ..
+    git clone https://github.com/libspatialindex/libspatialindex.git
+    cd libspatialindex
+    mkdir build && cd build
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
+    make -j$(nproc)
+    make install
+    cd ../../your-project  # Back to your project
     
-    Or build from source: https://github.com/libspatialindex/libspatialindex")
+    # Alternative locations supported:
+    # ../spatialindex/, ../deps/libspatialindex/, ../third-party/libspatialindex/
+    # ../dependencies/libspatialindex/, ../external/libspatialindex/
+    
+    BUILD FROM SOURCE (manual):
+    ===========================
+    Download from: https://github.com/libspatialindex/libspatialindex
+    Configure with: cmake -DCMAKE_INSTALL_PREFIX=/usr/local
+    Build with: make && sudo make install")
 endif()
 
 # Find TIFF library
-find_package(TIFF REQUIRED)
+find_package(TIFF QUIET)
+if(NOT TIFF_FOUND)
+    # Try to find TIFF in local builds
+    set(TIFF_LOCAL_PREFIXES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../libtiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../tiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libtiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/libtiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/tiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/libtiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../dependencies/tiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../external/libtiff
+        ${CMAKE_CURRENT_SOURCE_DIR}/../external/tiff
+    )
+    
+    find_path(TIFF_INCLUDE_DIR
+        NAMES tiff.h
+        PATHS ${TIFF_LOCAL_PREFIXES}
+        PATH_SUFFIXES 
+            include
+            libtiff
+            build/libtiff
+            build/install/include
+            install/include
+        NO_DEFAULT_PATH
+    )
+    
+    find_library(TIFF_LIBRARY
+        NAMES tiff libtiff tiff_d libtiff_d
+        PATHS ${TIFF_LOCAL_PREFIXES}
+        PATH_SUFFIXES 
+            lib
+            lib64
+            build/libtiff
+            build/lib
+            build/install/lib
+            install/lib
+        NO_DEFAULT_PATH
+    )
+    
+    if(TIFF_INCLUDE_DIR AND TIFF_LIBRARY)
+        set(TIFF_FOUND TRUE)
+        set(TIFF_INCLUDE_DIRS ${TIFF_INCLUDE_DIR})
+        set(TIFF_LIBRARIES ${TIFF_LIBRARY})
+        message(STATUS "Found TIFF in local build:")
+        message(STATUS "  Include: ${TIFF_INCLUDE_DIRS}")
+        message(STATUS "  Library: ${TIFF_LIBRARIES}")
+    endif()
+endif()
+
 if(NOT TIFF_FOUND)
     message(FATAL_ERROR "TIFF library not found. Please install it:
     
+    SYSTEM PACKAGES:
+    ================
     Ubuntu/Debian: sudo apt-get install libtiff-dev
     CentOS/RHEL:   sudo yum install libtiff-devel
     macOS:         brew install libtiff
     Conda:         conda install -c conda-forge libtiff
-    Windows:       vcpkg install tiff")
+    Windows:       vcpkg install tiff
+    
+    BUILD FROM SOURCE (will be auto-detected):
+    ==========================================
+    cd ..
+    git clone https://gitlab.com/libtiff/libtiff.git
+    cd libtiff
+    mkdir build && cd build
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
+    make -j$(nproc)
+    make install
+    cd ../../your-project")
 endif()
 
 # Include directories
@@ -275,4 +430,17 @@ if(BUILD_PYTHON_BINDINGS)
     message(STATUS "    Site packages:        ${Python3_SITELIB}")
     message(STATUS "  pybind11 found:         ${pybind11_FOUND}")
 endif()
+message(STATUS "")
+message(STATUS "TIP: For local source builds, use this directory structure:")
+message(STATUS "  parent-dir/")
+message(STATUS "    ├── libspatialindex/     (or spatialindex/)")
+message(STATUS "    │   └── build/")
+message(STATUS "    │       ├── include/")
+message(STATUS "    │       └── lib/")
+message(STATUS "    ├── libtiff/             (or tiff/)")
+message(STATUS "    │   └── build/")
+message(STATUS "    │       ├── include/")
+message(STATUS "    │       └── lib/")
+message(STATUS "    └── your-project/        (this project)")
+message(STATUS "        └── build/")
 message(STATUS "")
