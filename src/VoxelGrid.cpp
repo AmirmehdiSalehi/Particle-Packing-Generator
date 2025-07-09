@@ -262,7 +262,7 @@ void VoxelGrid::addInterfaceSegment(const Point3D& point) {
     IdVisitor visitor;
     spatialIndexSegs->intersectsWithQuery(queryPoint, visitor);
     
-    std::vector<const uint64_t> containingSegments;
+    std::vector<uint64_t> containingSegments;
     
     // Check which segments actually contain the point
     for (const auto foundSegmentId : visitor.GetResults()) {

@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cmath>
 #include <functional>
+#include <memory>
 
 namespace Packing {
 
