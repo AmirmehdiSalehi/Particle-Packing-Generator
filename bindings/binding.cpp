@@ -74,10 +74,8 @@ PYBIND11_MODULE(particle_packing, m) {
     py::class_<Packing::Particle>(m, "Particle")
         .def(py::init<uint16_t>())
         .def("getId", &Packing::Particle::getId)
-        .def("getSpheres", [](const Packing::Particle &p) {
-            // Create a copy of the vector to avoid lifetime issues
-            return std::vector<std::shared_ptr<Packing::Sphere>>(p.getSpheres());
-        }, py::return_value_policy::copy)
+        .def("getSpheres", &Packing::Particle::getSpheres, 
+            py::return_value_policy::reference_internal)
         .def("getCoreSphere", [](const Packing::Particle &p) {
             auto sphere = p.getCoreSphere();
             if (sphere) {
@@ -129,10 +127,6 @@ PYBIND11_MODULE(particle_packing, m) {
         .def("getSphereCount", &Packing::PackingGenerator::getSphereCount)
         .def("getParticles", &Packing::PackingGenerator::getParticles,
              py::return_value_policy::reference_internal)
-        // .def("getParticles", [](const Packing::PackingGenerator &pg) {
-        //     // Return a copy of the particle vector to ensure safety
-        //     return std::vector<Packing::Particle>(pg.getParticles());
-        // }, py::return_value_policy::copy)
         .def("getContactCount", &Packing::PackingGenerator::getContactCount)
         .def("getAverageCoordinationNumber", &Packing::PackingGenerator::getAverageCoordinationNumber)
         .def("getCoordinationNumbers", &Packing::PackingGenerator::getCoordinationNumbers, 

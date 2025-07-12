@@ -549,22 +549,7 @@ bool PackingGenerator::insertSuppSpheres(int x, int y, int z, int radius, uint16
     
     if (!particle) {
         return false; // Particle not found
-    }
-        
-    // Verify compactness criteria with existing spheres in the particle
-    bool meetsCriteria = false;
-    
-    // Should be overlapping with at least one existing sphere compactly (It automatically does!)
-    for (const auto& existingSphere : particle->getSpheres()) {
-        if (existingSphere->intersectsWith(x, y, z, radius, compactnessFactor)) {
-            meetsCriteria = true;
-            break;
-        }
-    }
-    
-    if (!meetsCriteria) {
-        return false;
-    }
+    }    
     
     // Add the sphere to the particle
     uint32_t sphereId = numSpheres;
@@ -727,7 +712,7 @@ std::vector<uint64_t> PackingGenerator::getSphereNeighbors(int x, int y, int z, 
             static_cast<double>(z)
         };
 
-     SpatialIndex::Ball queryBall(static_cast<double>(radius) * 1.5, sphereCenterCoords, 3);
+     SpatialIndex::Ball queryBall(static_cast<double>(radius) * 1.2, sphereCenterCoords, 3);
      
      IdVisitor visitor;
      spatialIndex->intersectsWithQuery(queryBall, visitor);
